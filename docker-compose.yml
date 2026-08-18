@@ -1,9 +1,19 @@
 services:
+  edge:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - web
+    ports:
+      - "${PUBLIC_PORT:-8080}:8080"
+    volumes:
+      - ./deploy/edge.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - testnet
+
   api:
-    build:
-      context: ../TestApi
-    image: testapi:local
-    container_name: testapi
+    image: ${API_IMAGE:-ghcr.io/nsampini/testapi:latest}
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Test
@@ -14,15 +24,12 @@ services:
       - testnet
 
   web:
-    build:
-      context: .
-    image: testweb:local
-    container_name: testweb
+    image: ${WEB_IMAGE:-ghcr.io/nsampini/testweb:latest}
     restart: unless-stopped
     depends_on:
       - api
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     networks:
       - testnet
 

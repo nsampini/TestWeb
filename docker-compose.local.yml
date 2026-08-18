@@ -1,0 +1,10 @@
+services:
+  api:
+    build:
+      context: ../TestApi
+    image: testapi:local
+
+  web:
+    build:
+      context: .
+    image: testweb:local
