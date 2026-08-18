@@ -1,0 +1,31 @@
+services:
+  api:
+    build:
+      context: ../TestApi
+    image: testapi:local
+    container_name: testapi
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Test
+      ASPNETCORE_URLS: http://+:8080
+    expose:
+      - "8080"
+    networks:
+      - testnet
+
+  web:
+    build:
+      context: .
+    image: testweb:local
+    container_name: testweb
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8080:8080"
+    networks:
+      - testnet
+
+networks:
+  testnet:
+    name: testnet
