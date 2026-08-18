@@ -31,7 +31,7 @@ env:
   VM_HOST: ${{ secrets.VM_HOST }}
   VM_USER: ${{ secrets.VM_USER }}
   VM_PORT: ${{ secrets.VM_PORT || '22' }}
-  VM_APP_DIR: ${{ secrets.VM_APP_DIR || '/opt/testweb' }}
+  VM_APP_DIR: ${{ secrets.VM_APP_DIR || 'C:/Deploy/TestWeb' }}
 
 jobs:
   build:
@@ -77,10 +77,6 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout
-        if: steps.deploy_config.outputs.enabled == 'true'
-        uses: actions/checkout@v4
-
       - name: Prepare SSH key
         if: steps.deploy_config.outputs.enabled == 'true'
         run: |
@@ -89,28 +85,12 @@ jobs:
           chmod 600 ~/.ssh/vm_key
           ssh-keyscan -p "$VM_PORT" "$VM_HOST" >> ~/.ssh/known_hosts
 
-      - name: Copy compose files
+      - name: Download compose files on VM
         if: steps.deploy_config.outputs.enabled == 'true'
         run: |
-          ssh -i ~/.ssh/vm_key -p "$VM_PORT" "$VM_USER@$VM_HOST" "mkdir -p '$VM_APP_DIR/deploy'"
-          scp -i ~/.ssh/vm_key -P "$VM_PORT" docker-compose.yml "$VM_USER@$VM_HOST:$VM_APP_DIR/docker-compose.yml"
-          scp -i ~/.ssh/vm_key -P "$VM_PORT" deploy/edge.conf "$VM_USER@$VM_HOST:$VM_APP_DIR/deploy/edge.conf"
+          ssh -i ~/.ssh/vm_key -p "$VM_PORT" "$VM_USER@$VM_HOST" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"`$ErrorActionPreference = 'Stop'; New-Item -ItemType Directory -Force -Path '$VM_APP_DIR/deploy' | Out-Null; Invoke-WebRequest 'https://raw.githubusercontent.com/${{ github.repository_owner }}/TestWeb/main/docker-compose.yml' -OutFile '$VM_APP_DIR/docker-compose.yml'; Invoke-WebRequest 'https://raw.githubusercontent.com/${{ github.repository_owner }}/TestWeb/main/deploy/edge.conf' -OutFile '$VM_APP_DIR/deploy/edge.conf'\""
 
       - name: Deploy on VM
         if: steps.deploy_config.outputs.enabled == 'true'
         run: |
-          ssh -i ~/.ssh/vm_key -p "$VM_PORT" "$VM_USER@$VM_HOST" "
-            set -e
-            cd '$VM_APP_DIR'
-            if [ -n '${{ secrets.GHCR_TOKEN }}' ]; then
-              echo '${{ secrets.GHCR_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USERNAME || github.repository_owner }}' --password-stdin
-            fi
-            printf '%s\n' \
-              'API_IMAGE=ghcr.io/${{ github.repository_owner }}/testapi:latest' \
-              'WEB_IMAGE=ghcr.io/${{ github.repository_owner }}/testweb:latest' \
-              'PUBLIC_PORT=$PUBLIC_PORT' \
-              > .env
-            docker compose pull
-            docker compose up -d --remove-orphans --scale api=$API_REPLICAS --scale web=$WEB_REPLICAS
-            docker image prune -f
-          "
+          ssh -i ~/.ssh/vm_key -p "$VM_PORT" "$VM_USER@$VM_HOST" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"`$ErrorActionPreference = 'Stop'; Set-Location '$VM_APP_DIR'; @('API_IMAGE=ghcr.io/${{ github.repository_owner }}/testapi:latest', 'WEB_IMAGE=ghcr.io/${{ github.repository_owner }}/testweb:latest', 'PUBLIC_PORT=$PUBLIC_PORT') | Set-Content -Encoding ascii .env; if ('${{ secrets.GHCR_TOKEN }}') { '${{ secrets.GHCR_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USERNAME || github.repository_owner }}' --password-stdin }; docker compose pull; docker compose up -d --remove-orphans --scale api=$API_REPLICAS --scale web=$WEB_REPLICAS; docker image prune -f\""
