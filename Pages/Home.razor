@@ -1,0 +1,65 @@
+@page "/"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Home</PageTitle>
+
+<h1>Front de pruebas</h1>
+
+<p>Consumo basico de la API local.</p>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @errorMessage
+    </div>
+}
+else if (products is null)
+{
+    <p><em>Cargando productos...</em></p>
+}
+else
+{
+    <div class="alert alert-success" role="alert">
+        API conectada correctamente.
+    </div>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Producto</th>
+                <th>Precio</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var product in products)
+            {
+                <tr>
+                    <td>@product.Id</td>
+                    <td>@product.Name</td>
+                    <td>@product.Price.ToString("C")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private Product[]? products;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            products = await Http.GetFromJsonAsync<Product[]>("/api/products");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"No se pudo conectar con la API. Verifica que este corriendo en http://localhost:5190. Detalle: {ex.Message}";
+        }
+    }
+
+    private sealed record Product(int Id, string Name, decimal Price);
+}
